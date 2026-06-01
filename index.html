@@ -51,6 +51,7 @@
   .bc-stat{display:flex;flex-direction:column;gap:2px}
   .bc-sl{font-size:11px;color:#888}
   .bc-sv{font-size:14px;font-weight:500;color:#1a1a1a}
+  .state-note{font-size:12px;color:#888;margin-top:6px;font-style:italic}
   @media(max-width:500px){.g3{grid-template-columns:1fr 1fr}.metrics{grid-template-columns:1fr 1fr}}
 </style>
 </head>
@@ -106,6 +107,7 @@
       <button class="bbase" id="b2" onclick="tog(2)">&#9670; 2nd base</button>
       <button class="bbase" id="b3" onclick="tog(3)">&#9670; 3rd base</button>
     </div>
+    <p id="state-note" class="state-note"></p>
   </div>
 
   <div class="sec">
@@ -121,7 +123,6 @@
   </div>
 
   <button class="go-btn" onclick="calc()">Run analysis &rarr;</button>
-
   <div id="res" class="res"></div>
 </div>
 
@@ -160,6 +161,19 @@ var RE={
 function baseKey(b1,b2,b3){return(b1?'1':'0')+(b2?'2':'0')+(b3?'3':'0');}
 function pitcherAdj(){return Math.max(0.5,Math.min(1.5,2.40/4.50));}
 
+// Correctly model force chain on a walk
+function walkNewState(b1,b2,b3){
+  var n1=true, n2=b2, n3=b3, runScores=false;
+  if(b1){
+    n2=true;
+    if(b2){
+      n3=true;
+      if(b3){ runScores=true; }
+    }
+  }
+  return {b1:n1,b2:n2,b3:n3,runScores:runScores};
+}
+
 function normCDF(x){
   var t=1/(1+0.2316419*Math.abs(x));
   var d=0.3989423*Math.exp(-x*x/2);
@@ -167,67 +181,43 @@ function normCDF(x){
   return x>0?1-p:p;
 }
 
-/*
-  WIN EXPECTANCY — always from West Orange's perspective (away team).
-  scoreDiff = us - them (positive means we're ahead).
-  
-  When pitching (bottom half): PCT is batting. Their run expectancy HURTS us.
-    - runsExpected is PCT's expected runs this half inning.
-    - A higher runsExpected shifts the effective score diff against us.
-    - effectiveDiff = scoreDiff - runsExpected
-    - WE = P(we win) = P(effectiveDiff > 0 after remaining play)
-    - In bottom half of last inning, PCT wins if they tie or take the lead,
-      so we use normCDF(effectiveDiff / sigma) where positive diff favors us.
-
-  When batting (top half): we are scoring. Our run expectancy HELPS us.
-    - runsExpected is our expected runs this half inning.
-    - effectiveDiff = scoreDiff + runsExpected
-*/
-function weModel(us, them, inning, outs, runsExpected, isBottomHalf) {
-  var scoreDiff = us - them; // positive = we're ahead
-
-  // Innings remaining for each team after this half inning completes
-  // We are away: top = us batting, bottom = them batting
-  // After bottom of inning N completes, remaining full innings = 7 - N for both (or 0 if 7th)
-  // During bottom half: this half inning is in progress; 
-  //   remaining innings after this: (7 - inning) full innings for us to bat, 
-  //   (7 - inning) full innings for them to bat (already batted top this inning)
-  // During top half: this half in progress;
-  //   remaining innings after this: (7 - inning) for them (bottom still to come this inning + future)
-  //   remaining for us: (7 - inning) full innings after this
-
-  var inningsRemaining;
-  if (isBottomHalf) {
-    // bottom half in progress: after it ends, game may be over (if we're ahead) 
-    // or (7-inning) full innings remain
-    inningsRemaining = Math.max(0, (7 - inning)) + (2 - outs) / 3;
-  } else {
-    // top half in progress: bottom half still to come this inning + future innings
-    inningsRemaining = Math.max(0, (7 - inning) + 0.5) + (2 - outs) / 3;
-  }
-
-  var sigma = Math.sqrt(Math.max(inningsRemaining, 0.1) * 0.9 + 0.3);
-
-  var effectiveDiff;
-  if (isBottomHalf) {
-    // their run expectancy reduces our lead
-    effectiveDiff = scoreDiff - runsExpected;
-  } else {
-    // our run expectancy increases our lead
-    effectiveDiff = scoreDiff + runsExpected;
-  }
-
-  // P(West Orange wins) — positive effectiveDiff means we're more likely to win
-  var we = normCDF(effectiveDiff / sigma);
-  return Math.min(0.97, Math.max(0.03, we));
+function weModel(us,them,inning,outs,runsExpected,isBot){
+  var scoreDiff=us-them;
+  var inningsRemaining=isBot
+    ? Math.max(0,(7-inning))+(2-outs)/3
+    : Math.max(0,(7-inning)+0.5)+(2-outs)/3;
+  var sigma=Math.sqrt(Math.max(inningsRemaining,0.1)*0.9+0.3);
+  var effectiveDiff=isBot?(scoreDiff-runsExpected):(scoreDiff+runsExpected);
+  return Math.min(0.97,Math.max(0.03,normCDF(effectiveDiff/sigma)));
 }
 
 var bases={1:false,2:false,3:false};
+
 function tog(n){
   bases[n]=!bases[n];
   var btn=document.getElementById('b'+n);
   if(bases[n]){btn.classList.add('on');}else{btn.classList.remove('on');}
+  updateStateNote();
 }
+
+function updateStateNote(){
+  var b1=bases[1],b2=bases[2],b3=bases[3];
+  var ws=walkNewState(b1,b2,b3);
+  var parts=[];
+  if(b1) parts.push('1st');
+  if(b2) parts.push('2nd');
+  if(b3) parts.push('3rd');
+  var current=parts.length===0?'Bases empty':('Runners on '+parts.join(', '));
+  var wparts=[];
+  if(ws.b1) wparts.push('1st');
+  if(ws.b2) wparts.push('2nd');
+  if(ws.b3) wparts.push('3rd');
+  var after=wparts.length===3?'bases loaded':('runners on '+wparts.join(', '));
+  var note=current+' \u2192 walk would put '+after;
+  if(ws.runScores) note+=' (run scores)';
+  document.getElementById('state-note').textContent=note;
+}
+updateStateNote();
 
 function populateSelect(id,selectedName){
   var sel=document.getElementById(id);sel.innerHTML='';
@@ -266,7 +256,7 @@ function calc(){
   var batter=ROSTER.find(function(p){return p.name===bName;});
   var ondeck=ROSTER.find(function(p){return p.name===odName;});
   var inning=parseInt(document.getElementById('inn').value);
-  var isBottomHalf=document.getElementById('half').value==='bot';
+  var isBot=document.getElementById('half').value==='bot';
   var outs=parseInt(document.getElementById('outs').value);
   var us=parseInt(document.getElementById('us').value)||0;
   var them=parseInt(document.getElementById('them').value)||0;
@@ -275,41 +265,40 @@ function calc(){
   var b1=bases[1],b2=bases[2],b3=bases[3];
   var el=document.getElementById('res');
 
-  if(b1&&b2&&b3){
-    el.innerHTML='<div class="verdict-card"><p class="verdict-big" style="color:#c0392b">Do not walk — bases loaded</p><p class="verdict-sub">Walking with the bases loaded gives up a free run. Pitch to the batter regardless of the situation.</p></div>';
-    return;
-  }
-
   var pitAdj=pitcherAdj();
   var batWoba=woba(batter);
   var odWoba=woba(ondeck);
 
   var reNow=RE[baseKey(b1,b2,b3)][outs];
 
-  // Expected runs if we pitch to current batter
-  var baseRE=RE[baseKey(b1,b2,b3)][outs];
+  // Run expectancy if we pitch — batter's marginal contribution adjusted for count and Pimm
   var batRunContrib=(batWoba-avgWoba)*1.15*pitAdj;
   var countMult=1+(balls*0.04-strikes*0.05);
   countMult=Math.max(0.7,Math.min(1.4,countMult));
-  // Run expectancy = base state RE + batter's marginal contribution, scaled by count
-  var reIfPitch=baseRE + batRunContrib * countMult;
+  var reIfPitch=reNow+batRunContrib*countMult;
 
-  // Expected runs if we walk batter (new base state + on-deck batter faces us)
-  var newB2=b1||b2;
-  var reWalkKey=baseKey(true,newB2,b3);
-  var reAfterWalk=RE[reWalkKey]?RE[reWalkKey][outs]:reNow;
+  // Walk: compute correct new base state via force chain
+  var ws=walkNewState(b1,b2,b3);
+
+  // If bases were already loaded, a walk always scores a run
+  if(b1&&b2&&b3){
+    el.innerHTML='<div class="verdict-card"><p class="verdict-big" style="color:#c0392b">Do not walk — bases loaded</p><p class="verdict-sub">An intentional walk with the bases loaded scores a run automatically. Pitch to the batter.</p></div>';
+    return;
+  }
+
+  var reAfterWalk=RE[baseKey(ws.b1,ws.b2,ws.b3)][outs];
+  // If the walk itself scores a run (forced from loaded — already handled above)
+  // add 1 to their effective run total
+  var walkRunBonus=ws.runScores?1:0;
   var odRunContrib=(odWoba-avgWoba)*1.15*pitAdj;
-  var reIfWalk=reAfterWalk + odRunContrib;
+  var reIfWalk=reAfterWalk+odRunContrib+walkRunBonus;
 
-  // Win expectancy — always from West Orange (away) perspective
-  var weNow   = weModel(us, them, inning, outs, 0,           isBottomHalf);
-  var wePitch = weModel(us, them, inning, outs, reIfPitch,   isBottomHalf);
-  var weWalk  = weModel(us, them, inning, outs, reIfWalk,    isBottomHalf);
+  var weNow  =weModel(us,them,inning,outs,0,         isBot);
+  var wePitch=weModel(us,them,inning,outs,reIfPitch, isBot);
+  var weWalk =weModel(us,them,inning,outs,reIfWalk,  isBot);
 
   var weDeltaPitch=(wePitch-weNow)*100;
   var weDeltaWalk=(weWalk-weNow)*100;
-  // Walk is better for us if it LOWERS their run expectancy relative to pitching
-  // i.e. weWalk > wePitch means walking leads to higher WE for us
   var weCompare=weWalk-wePitch;
 
   var verdict,vsub,vcolor;
@@ -321,6 +310,12 @@ function calc(){
 
   function fmt(v){return v>=0?'+'+v.toFixed(2):v.toFixed(2);}
   function fmtPct(v){return (v*100).toFixed(1)+'%';}
+
+  var wparts=[];
+  if(ws.b1)wparts.push('1st');
+  if(ws.b2)wparts.push('2nd');
+  if(ws.b3)wparts.push('3rd');
+  var afterStateStr=wparts.length===3?'Bases loaded':('Runners on '+wparts.join(', '));
 
   el.innerHTML=
     '<div class="verdict-card">'+
@@ -341,9 +336,10 @@ function calc(){
     '</div>'+
     '<div class="breakdown">'+
       '<div class="bd-head"><span>Factor breakdown</span><div class="bd-head-vals"><span class="bd-hv">Pitch</span><span class="bd-hv">Walk</span></div></div>'+
-      '<div class="bd-row"><span class="bd-name">Base state RE</span><div class="bd-vals"><span class="bd-v">'+reNow.toFixed(3)+'</span><span class="bd-v">'+reNow.toFixed(3)+'</span></div></div>'+
+      '<div class="bd-row"><span class="bd-name">Base state RE now</span><div class="bd-vals"><span class="bd-v">'+reNow.toFixed(3)+'</span><span class="bd-v">'+reNow.toFixed(3)+'</span></div></div>'+
+      '<div class="bd-row"><span class="bd-name">State after PA</span><div class="bd-vals"><span class="bd-v" style="font-size:11px">pitch to him</span><span class="bd-v" style="font-size:11px">'+afterStateStr+'</span></div></div>'+
+      '<div class="bd-row"><span class="bd-name">RE after walk base state</span><div class="bd-vals"><span class="bd-v">&mdash;</span><span class="bd-v">'+reAfterWalk.toFixed(3)+'</span></div></div>'+
       '<div class="bd-row"><span class="bd-name">Expected runs this half</span><div class="bd-vals"><span class="bd-v">'+reIfPitch.toFixed(3)+'</span><span class="bd-v">'+reIfWalk.toFixed(3)+'</span></div></div>'+
-      '<div class="bd-row"><span class="bd-name">RE delta vs base state</span><div class="bd-vals"><span class="bd-v">'+fmt(reIfPitch-reNow)+'</span><span class="bd-v">'+fmt(reIfWalk-reNow)+'</span></div></div>'+
       '<div class="bd-row"><span class="bd-name">Batter wOBA</span><div class="bd-vals"><span class="bd-v">'+batWoba.toFixed(3)+'</span><span class="bd-v">&mdash;</span></div></div>'+
       '<div class="bd-row"><span class="bd-name">On-deck wOBA</span><div class="bd-vals"><span class="bd-v">&mdash;</span><span class="bd-v">'+odWoba.toFixed(3)+'</span></div></div>'+
       '<div class="bd-row"><span class="bd-name">Pimm ERA adjustment</span><div class="bd-vals"><span class="bd-v">'+pitAdj.toFixed(2)+'x</span><span class="bd-v">'+pitAdj.toFixed(2)+'x</span></div></div>'+
