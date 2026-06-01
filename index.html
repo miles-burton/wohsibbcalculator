@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IBB Decision Calculator — West Orange HS</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f3;color:#1a1a1a;padding:24px 16px;min-height:100vh}
+  .container{max-width:680px;margin:0 auto}
+  h1{font-size:20px;font-weight:500;margin-bottom:4px;color:#1a1a1a}
+  .subtitle{font-size:13px;color:#888;margin-bottom:28px}
+  .sec{margin-bottom:22px}
+  .sec-label{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.07em;font-weight:500;margin:0 0 10px}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  .fg{display:flex;flex-direction:column;gap:5px}
+  .fg label{font-size:13px;color:#555}
+  select,input[type="number"]{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;color:#1a1a1a;appearance:auto;outline:none}
+  select:focus,input:focus{border-color:#888}
+  .base-row{display:flex;gap:8px;margin-top:2px}
+  .bbase{flex:1;padding:9px 4px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;cursor:pointer;background:#fff;color:#888;text-align:center;transition:all .15s;user-select:none;font-family:inherit}
+  .bbase:hover{border-color:#aaa;color:#555}
+  .bbase.on{background:#fff8e6;border-color:#d4a017;color:#8a6200;font-weight:600}
+  .divider{height:1px;background:#e5e5e5;margin:20px 0}
+  .go-btn{width:100%;padding:12px;border-radius:8px;font-size:15px;font-weight:500;cursor:pointer;background:#1a1a1a;border:none;color:#fff;margin-top:4px;transition:background .15s;font-family:inherit}
+  .go-btn:hover{background:#333}
+  .res{margin-top:20px}
+  .verdict-card{border-radius:12px;border:1px solid #e5e5e5;background:#fff;padding:1.25rem 1.5rem;margin-bottom:14px}
+  .verdict-big{font-size:24px;font-weight:500;margin:0 0 4px}
+  .verdict-sub{font-size:13px;color:#888;margin:0 0 16px}
+  .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+  .mc{background:#f5f5f3;border-radius:8px;padding:10px 12px}
+  .mc-label{font-size:11px;color:#888;margin:0 0 4px}
+  .mc-val{font-size:18px;font-weight:500;color:#1a1a1a;margin:0}
+  .mc-sub{font-size:11px;color:#aaa;margin:2px 0 0}
+  .we-bar-wrap{margin-top:14px}
+  .we-bar-label{font-size:12px;color:#888;margin:0 0 6px}
+  .we-track{height:8px;background:#e5e5e5;border-radius:4px;overflow:hidden;margin-bottom:8px}
+  .we-fill{height:100%;border-radius:4px;transition:width .5s ease}
+  .we-row-label{font-size:11px;color:#888;margin-bottom:3px}
+  .breakdown{border-radius:12px;border:1px solid #e5e5e5;background:#fff;padding:1rem 1.25rem}
+  .bd-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f0f0f0}
+  .bd-row:last-child{border-bottom:none}
+  .bd-name{font-size:13px;color:#666}
+  .bd-vals{display:flex;gap:20px;font-size:13px}
+  .bd-v{text-align:right;min-width:54px;color:#1a1a1a}
+  .bd-head{font-size:11px;color:#aaa;display:flex;justify-content:space-between;margin-bottom:8px}
+  .bd-head-vals{display:flex;gap:20px}
+  .bd-hv{min-width:54px;text-align:right}
+  .batter-card{background:#f5f5f3;border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;gap:20px;flex-wrap:wrap}
+  .bc-stat{display:flex;flex-direction:column;gap:2px}
+  .bc-sl{font-size:11px;color:#888}
+  .bc-sv{font-size:14px;font-weight:500;color:#1a1a1a}
+  @media(max-width:500px){.g3{grid-template-columns:1fr 1fr}.metrics{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>IBB Decision Calculator</h1>
+  <p class="subtitle">West Orange HS vs PCT — Jack Pimm on the mound</p>
+
+  <div class="sec">
+    <p class="sec-label">Batter selection</p>
+    <div class="g2">
+      <div class="fg"><label>Current batter</label><select id="batter"></select></div>
+      <div class="fg"><label>On-deck batter</label><select id="ondeck"></select></div>
+    </div>
+  </div>
+
+  <div id="batter-stats" style="display:none" class="batter-card"></div>
+
+  <div class="sec">
+    <p class="sec-label">Game situation</p>
+    <div class="g3" style="margin-bottom:12px">
+      <div class="fg"><label>Inning</label>
+        <select id="inn">
+          <option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option>
+          <option value="4">4th</option><option value="5">5th</option><option value="6">6th</option>
+          <option value="7" selected>7th</option>
+        </select>
+      </div>
+      <div class="fg"><label>Half</label>
+        <select id="half">
+          <option value="bot">Bottom (we're pitching)</option>
+          <option value="top">Top (we're batting)</option>
+        </select>
+      </div>
+      <div class="fg"><label>Outs</label>
+        <select id="outs">
+          <option value="0">0 outs</option>
+          <option value="1" selected>1 out</option>
+          <option value="2">2 outs</option>
+        </select>
+      </div>
+    </div>
+    <div class="g2">
+      <div class="fg"><label>Our score</label><input type="number" id="us" value="3" min="0" max="30"></div>
+      <div class="fg"><label>Their score</label><input type="number" id="them" value="3" min="0" max="30"></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <p class="sec-label">Baserunners — click to toggle</p>
+    <div class="base-row">
+      <button class="bbase" id="b1" onclick="tog(1)">&#9670; 1st base</button>
+      <button class="bbase" id="b2" onclick="tog(2)">&#9670; 2nd base</button>
+      <button class="bbase" id="b3" onclick="tog(3)">&#9670; 3rd base</button>
+    </div>
+  </div>
+
+  <div class="sec">
+    <p class="sec-label">Count</p>
+    <div class="g2">
+      <div class="fg"><label>Balls</label>
+        <select id="balls"><option value="0" selected>0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
+      </div>
+      <div class="fg"><label>Strikes</label>
+        <select id="strikes"><option value="0" selected>0</option><option value="1">1</option><option value="2">2</option></select>
+      </div>
+    </div>
+  </div>
+
+  <button class="go-btn" onclick="calc()">Run analysis &rarr;</button>
+
+  <div id="res" class="res"></div>
+</div>
+
+<script>
+const ROSTER=[
+  {name:"Mickey Gilligan #12",ab:68,r:48,h:42,rbi:43,s:18,d:8,t:4,hr:12,bb:25,hbp:9,sf:0},
+  {name:"Randis Rosario #4",ab:90,r:37,h:44,rbi:45,s:23,d:13,t:0,hr:8,bb:15,hbp:5,sf:0},
+  {name:"Melvin Genao #6",ab:96,r:43,h:55,rbi:25,s:42,d:10,t:2,hr:1,bb:17,hbp:1,sf:0},
+  {name:"Francis Juliano #24",ab:75,r:26,h:23,rbi:33,s:9,d:7,t:1,hr:6,bb:25,hbp:6,sf:0},
+  {name:"Yordany Herrera #2",ab:77,r:23,h:27,rbi:37,s:15,d:8,t:1,hr:3,bb:15,hbp:4,sf:0},
+  {name:"Ronny Rodriguez #8",ab:80,r:21,h:35,rbi:21,s:25,d:5,t:0,hr:5,bb:8,hbp:4,sf:0},
+  {name:"Devin Gerena #3",ab:63,r:13,h:15,rbi:11,s:13,d:2,t:0,hr:0,bb:11,hbp:5,sf:2},
+  {name:"Justin Brown #5",ab:63,r:17,h:17,rbi:13,s:10,d:6,t:0,hr:1,bb:5,hbp:0,sf:0},
+  {name:"Jandiel Ortiz #20",ab:44,r:18,h:8,rbi:11,s:6,d:1,t:0,hr:1,bb:10,hbp:9,sf:0},
+  {name:"Devin Pollock #23",ab:20,r:3,h:6,rbi:5,s:5,d:1,t:0,hr:0,bb:3,hbp:1,sf:0},
+  {name:"Tyler Meyers #7",ab:23,r:4,h:4,rbi:5,s:4,d:0,t:0,hr:0,bb:6,hbp:1,sf:1},
+];
+
+function woba(p){const pa=p.ab+p.bb+p.hbp+p.sf;if(pa===0)return 0;return(0.69*p.bb+0.72*p.hbp+0.89*p.s+1.27*p.d+1.62*p.t+2.10*p.hr)/pa;}
+function avgP(p){return p.ab>0?p.h/p.ab:0;}
+function slg(p){return p.ab>0?(p.s+2*p.d+3*p.t+4*p.hr)/p.ab:0;}
+function obp(p){const pa=p.ab+p.bb+p.hbp+p.sf;return pa>0?(p.h+p.bb+p.hbp)/pa:0;}
+const avgWoba=ROSTER.reduce((s,p)=>s+woba(p),0)/ROSTER.length;
+
+const RE={
+  "000":{0:0.555,1:0.297,2:0.117},
+  "100":{0:0.953,1:0.573,2:0.251},
+  "020":{0:1.189,1:0.725,2:0.344},
+  "003":{0:1.482,1:0.983,2:0.387},
+  "120":{0:1.587,1:0.971,2:0.463},
+  "103":{0:1.880,1:1.259,2:0.521},
+  "023":{0:2.116,1:1.411,2:0.604},
+  "123":{0:2.414,1:1.685,2:0.757},
+};
+
+function baseKey(b1,b2,b3){return(b1?'1':'0')+(b2?'2':'0')+(b3?'3':'0');}
+function pitcherAdj(){return Math.max(0.5,Math.min(1.5,2.40/4.50));}
+function batRunVal(p,outs,b1,b2,b3){const w=woba(p);const baseRE=RE[baseKey(b1,b2,b3)][outs];const pitAdj=pitcherAdj();return baseRE+(w-avgWoba)*1.15*pitAdj;}
+
+function normCDF(x){const t=1/(1+0.2316419*Math.abs(x));const d=0.3989423*Math.exp(-x*x/2);const p=d*t*(0.3193815+t*(-0.3565638+t*(1.7814779+t*(-1.8212560+t*1.3302744))));return x>0?1-p:p;}
+
+function weModel(scoreDiff,inning,outs,runsExpected,isTop){
+  const inningsLeft=(7-inning)+(isTop?1:0);
+  const totalInningsLeft=Math.max(0,inningsLeft+(2-outs)/3);
+  const adjustedDiff=scoreDiff-runsExpected;
+  const sigma=Math.sqrt(totalInningsLeft*0.9+0.5);
+  const we=normCDF(adjustedDiff/sigma);
+  return Math.min(0.98,Math.max(0.02,isTop?we:1-we));
+}
+
+const bases={1:false,2:false,3:false};
+function tog(n){
+  bases[n]=!bases[n];
+  var btn=document.getElementById('b'+n);
+  if(bases[n]){btn.classList.add('on');}else{btn.classList.remove('on');}
+}
+
+function populateSelect(id,selectedName){
+  var sel=document.getElementById(id);sel.innerHTML='';
+  ROSTER.forEach(function(p){var o=document.createElement('option');o.value=p.name;o.textContent=p.name;if(p.name===selectedName)o.selected=true;sel.appendChild(o);});
+}
+populateSelect('batter','Mickey Gilligan #12');
+populateSelect('ondeck','Randis Rosario #4');
+document.getElementById('batter').addEventListener('change',showBatterStats);
+
+function showBatterStats(){
+  var name=document.getElementById('batter').value;
+  var p=ROSTER.find(function(x){return x.name===name;});
+  var el=document.getElementById('batter-stats');
+  if(!p){el.style.display='none';return;}
+  var pa=p.ab+p.bb+p.hbp+p.sf;
+  el.style.display='flex';
+  el.innerHTML=
+    '<div class="bc-stat"><span class="bc-sl">AVG</span><span class="bc-sv">'+avgP(p).toFixed(3)+'</span></div>'+
+    '<div class="bc-stat"><span class="bc-sl">OBP</span><span class="bc-sv">'+obp(p).toFixed(3)+'</span></div>'+
+    '<div class="bc-stat"><span class="bc-sl">SLG</span><span class="bc-sv">'+slg(p).toFixed(3)+'</span></div>'+
+    '<div class="bc-stat"><span class="bc-sl">wOBA</span><span class="bc-sv">'+woba(p).toFixed(3)+'</span></div>'+
+    '<div class="bc-stat"><span class="bc-sl">HR</span><span class="bc-sv">'+p.hr+'</span></div>'+
+    '<div class="bc-stat"><span class="bc-sl">BB</span><span class="bc-sv">'+p.bb+'</span></div>'+
+    '<div class="bc-stat"><span class="bc-sl">PA</span><span class="bc-sv">'+pa+'</span></div>';
+}
+showBatterStats();
+
+function calc(){
+  var bName=document.getElementById('batter').value;
+  var odName=document.getElementById('ondeck').value;
+  var batter=ROSTER.find(function(p){return p.name===bName;});
+  var ondeck=ROSTER.find(function(p){return p.name===odName;});
+  var inning=parseInt(document.getElementById('inn').value);
+  var isTop=document.getElementById('half').value==='top';
+  var outs=parseInt(document.getElementById('outs').value);
+  var us=parseInt(document.getElementById('us').value)||0;
+  var them=parseInt(document.getElementById('them').value)||0;
+  var balls=parseInt(document.getElementById('balls').value);
+  var strikes=parseInt(document.getElementById('strikes').value);
+  var b1=bases[1],b2=bases[2],b3=bases[3];
+  var scoreDiff=isTop?(us-them):(them-us);
+  var el=document.getElementById('res');
+
+  if(b1&&b2&&b3){
+    el.innerHTML='<div class="verdict-card"><p class="verdict-big" style="color:#c0392b">Do not walk — bases loaded</p><p class="verdict-sub">Walking with the bases loaded gives up a free run. Pitch to the batter regardless of the situation.</p></div>';
+    return;
+  }
+
+  var batWoba=woba(batter);
+  var odWoba=woba(ondeck);
+  var pitAdj=pitcherAdj();
+  var reNow=RE[baseKey(b1,b2,b3)][outs];
+  var runsIfPitch=batRunVal(batter,outs,b1,b2,b3);
+  var newB2=b1||b2;
+  var reWalkKey=baseKey(true,newB2,b3);
+  var reAfterWalkVal=RE[reWalkKey]?RE[reWalkKey][outs]:reNow;
+  var odRunVal=(odWoba-avgWoba)*1.15*pitAdj;
+  var runsIfWalk=reAfterWalkVal+odRunVal;
+  var countMult=1+(balls*0.04-strikes*0.05);
+  var adjRunsIfPitch=runsIfPitch*Math.max(0.7,Math.min(1.4,countMult));
+  var reDeltaPitch=adjRunsIfPitch-reNow;
+  var reDeltaWalk=runsIfWalk-reNow;
+  var weNow=weModel(scoreDiff,inning,outs,0,isTop);
+  var wePitch=weModel(scoreDiff,inning,outs,reDeltaPitch,isTop);
+  var weWalk=weModel(scoreDiff,inning,outs,reDeltaWalk,isTop);
+  var weDeltaPitch=(wePitch-weNow)*100;
+  var weDeltaWalk=(weWalk-weNow)*100;
+  var weCompare=weWalk-wePitch;
+
+  var verdict,vsub,vcolor;
+  if(weCompare>0.03){verdict='Walk him';vsub='Win expectancy is meaningfully higher by issuing the intentional walk.';vcolor='#1a7a4a';}
+  else if(weCompare>0.01){verdict='Lean toward walking';vsub="A slight WE edge for the walk — worth considering with your pitcher's confidence.";vcolor='#b07d00';}
+  else if(weCompare>-0.01){verdict='Toss-up';vsub="The numbers are essentially even. Trust your pitcher's matchup feel.";vcolor='#1a5fa5';}
+  else if(weCompare>-0.03){verdict='Lean toward pitching';vsub="A slight WE edge for pitching to him — the next batter isn't enough of a downgrade.";vcolor='#b07d00';}
+  else{verdict='Pitch to him';vsub="Win expectancy is higher by pitching to the batter. Don't give him a free pass.";vcolor='#c0392b';}
+
+  function fmt(v){return v>=0?'+'+v.toFixed(2):v.toFixed(2);}
+  function fmtPct(v){return (v*100).toFixed(1)+'%';}
+
+  el.innerHTML=
+    '<div class="verdict-card">'+
+      '<p class="verdict-big" style="color:'+vcolor+'">'+verdict+'</p>'+
+      '<p class="verdict-sub">'+vsub+'</p>'+
+      '<div class="metrics">'+
+        '<div class="mc"><p class="mc-label">WE if pitched to</p><p class="mc-val">'+fmtPct(wePitch)+'</p><p class="mc-sub">'+fmt(weDeltaPitch)+'% vs now</p></div>'+
+        '<div class="mc"><p class="mc-label">WE if walked</p><p class="mc-val">'+fmtPct(weWalk)+'</p><p class="mc-sub">'+fmt(weDeltaWalk)+'% vs now</p></div>'+
+        '<div class="mc"><p class="mc-label">WE delta (walk &minus; pitch)</p><p class="mc-val" style="color:'+(weCompare>0?'#1a7a4a':weCompare<0?'#c0392b':'inherit')+'">'+fmt(weCompare*100)+'%</p><p class="mc-sub">positive = walk better</p></div>'+
+      '</div>'+
+      '<div class="we-bar-wrap">'+
+        '<p class="we-bar-label">Win expectancy comparison</p>'+
+        '<p class="we-row-label">Pitch to him &mdash; '+fmtPct(wePitch)+'</p>'+
+        '<div class="we-track"><div class="we-fill" style="width:'+parseFloat((wePitch*100).toFixed(1))+'%;background:#2980b9"></div></div>'+
+        '<p class="we-row-label">Walk him &mdash; '+fmtPct(weWalk)+'</p>'+
+        '<div class="we-track"><div class="we-fill" style="width:'+parseFloat((weWalk*100).toFixed(1))+'%;background:#1a7a4a"></div></div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="breakdown">'+
+      '<div class="bd-head"><span>Factor breakdown</span><div class="bd-head-vals"><span class="bd-hv">Pitch</span><span class="bd-hv">Walk</span></div></div>'+
+      '<div class="bd-row"><span class="bd-name">Run expectancy now</span><div class="bd-vals"><span class="bd-v">'+reNow.toFixed(3)+'</span><span class="bd-v">'+reNow.toFixed(3)+'</span></div></div>'+
+      '<div class="bd-row"><span class="bd-name">Expected RE after PA</span><div class="bd-vals"><span class="bd-v">'+adjRunsIfPitch.toFixed(3)+'</span><span class="bd-v">'+runsIfWalk.toFixed(3)+'</span></div></div>'+
+      '<div class="bd-row"><span class="bd-name">RE delta</span><div class="bd-vals"><span class="bd-v">'+fmt(reDeltaPitch)+'</span><span class="bd-v">'+fmt(reDeltaWalk)+'</span></div></div>'+
+      '<div class="bd-row"><span class="bd-name">Batter wOBA</span><div class="bd-vals"><span class="bd-v">'+batWoba.toFixed(3)+'</span><span class="bd-v">&mdash;</span></div></div>'+
+      '<div class="bd-row"><span class="bd-name">On-deck wOBA</span><div class="bd-vals"><span class="bd-v">&mdash;</span><span class="bd-v">'+odWoba.toFixed(3)+'</span></div></div>'+
+      '<div class="bd-row"><span class="bd-name">Pimm ERA adjustment</span><div class="bd-vals"><span class="bd-v">'+pitAdj.toFixed(2)+'x</span><span class="bd-v">'+pitAdj.toFixed(2)+'x</span></div></div>'+
+      '<div class="bd-row"><span class="bd-name">Count adjustment</span><div class="bd-vals"><span class="bd-v">'+countMult.toFixed(2)+'x</span><span class="bd-v">&mdash;</span></div></div>'+
+      '<div class="bd-row"><span class="bd-name">Win expectancy now</span><div class="bd-vals"><span class="bd-v">'+fmtPct(weNow)+'</span><span class="bd-v"></span></div></div>'+
+    '</div>';
+}
+</script>
+</body>
+</html>
